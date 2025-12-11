@@ -3,55 +3,76 @@ import pandas as pd
 import joblib
 import numpy as np
 import argparse
-from sklearn.metrics import accuracy_score
 
 FEATURES = ['ret_1','logret_1','ma_5','ma_15','ma_60','ma_5_15','vol_10','vol_60','rsi_14','bb_percent']
 
-def simple_backtest(feature_csv='data/btc_features.csv', model_path='models/lgb_model.pkl', initial_capital=10000, position_size=0.1, slippage=0.0005):
+def improved_backtest(feature_csv='data/btc_features.csv', model_path='models/lgb_model.pkl',
+                      initial_capital=10000, position_size=0.1, slippage=0.0003):
+
     df = pd.read_csv(feature_csv, index_col=0, parse_dates=True)
     model = joblib.load(model_path)
+
     X = df[FEATURES]
     preds = model.predict(X)
-    df = df.iloc[len(df) - len(preds):].copy()
+
+    df = df.iloc[-len(preds):].copy()
     df['pred_prob'] = preds
-    df['pred'] = (df['pred_prob'] > 0.5).astype(int)
-    # simulate: every minute we take a long if pred==1, else flat
-    capital = initial_capital
-    cash = capital
-    pos = 0.0
+    df['pred'] = (preds > 0.5).astype(int)
+
+    cash = initial_capital
+    position_qty = 0
+    entry_price = None
+
     equity_curve = []
-    for idx, row in df.iterrows():
-        price = row['close']
-        signal = row['pred']
-        # close previous position at current price
-        if pos != 0:
-            pnl = pos * (price - prev_price) - abs(pos) * slippage * price
-            cash += pnl
-            pos = 0
-        # open new pos if signal==1
-        if signal == 1:
+
+    for i in range(len(df)-1):
+        price = df['close'].iloc[i]
+        next_price = df['close'].iloc[i+1]
+        signal = df['pred'].iloc[i]
+
+        # If we have a position, update equity with mark-to-market
+        if position_qty > 0:
+            unrealized_pnl = position_qty * (price - entry_price)
+        else:
+            unrealized_pnl = 0
+
+        # ENTRY LOGIC
+        if signal == 1 and position_qty == 0:
             trade_value = cash * position_size
-            qty = trade_value / price
-            # pay slippage round-trip approx
+            position_qty = trade_value / price
+            entry_price = price * (1 + slippage)  # pay slippage
             cash -= trade_value
-            pos = qty
-            prev_price = price
-        equity = cash + pos * price
-        equity_curve.append({'datetime': idx, 'equity': equity, 'signal': signal})
-    eq = pd.DataFrame(equity_curve).set_index('datetime')
+
+        # EXIT LOGIC
+        elif signal == 0 and position_qty > 0:
+            cash += position_qty * price * (1 - slippage)
+            position_qty = 0
+            entry_price = None
+
+        # Mark-to-market equity
+        equity = cash
+        if position_qty > 0:
+            equity += position_qty * price
+
+        equity_curve.append({"datetime": df.index[i], "equity": equity})
+
+    eq = pd.DataFrame(equity_curve).set_index("datetime")
     eq['returns'] = eq['equity'].pct_change().fillna(0)
+
     total_return = eq['equity'].iloc[-1] / eq['equity'].iloc[0] - 1
-    sharpe = (eq['returns'].mean() / (eq['returns'].std() + 1e-12)) * np.sqrt(252 * 24 * 60)  # minute freq approx
+    sharpe = eq['returns'].mean() / (eq['returns'].std() + 1e-12) * np.sqrt(1440)  # 1440 min/day
+
     print("Total return:", total_return)
-    print("Sharpe (est):", sharpe)
-    eq.to_csv('results/equity_curve.csv')
-    print("Saved equity curve to results/equity_curve.csv")
+    print("Sharpe:", sharpe)
+
+    eq.to_csv("results/equity_curve.csv")
+    print("Saved improved equity curve to results/equity_curve.csv")
+
 
 if __name__ == "__main__":
-    import os
     parser = argparse.ArgumentParser()
     parser.add_argument('--feature_csv', default='data/btc_features.csv')
     parser.add_argument('--model_path', default='models/lgb_model.pkl')
     args = parser.parse_args()
-    os.makedirs('results', exist_ok=True)
-    simple_backtest(args.feature_csv, args.model_path)
+
+    improved_backtest(args.feature_csv, args.model_path)
