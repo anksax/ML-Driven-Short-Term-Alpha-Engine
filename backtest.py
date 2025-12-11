@@ -26,7 +26,7 @@ def walk_forward_backtest(feature_csv='data/btc_features.csv', initial_capital=1
                           base_position_fraction=0.05,  # fraction of capital used as baseline
                           target_vol=0.002,   # target per-minute vol (tunable)
                           retrain_minutes=1440, # retrain daily (1440 minutes)
-                          train_window_minutes=1440*7, # train on last 7 days
+                          train_window_minutes=1440*2, # train on last 2 days
                           slippage=0.0003,
                           stop_loss_pct=0.003, # 0.3%
                           take_profit_pct=0.006 # 0.6%
