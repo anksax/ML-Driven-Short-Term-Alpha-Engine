@@ -23,8 +23,8 @@ if st.sidebar.button("Load model & data"):
         feat_names = X.columns.tolist()
         imp_df = pd.DataFrame({'feature': feat_names, 'importance': importances}).sort_values('importance', ascending=False)
         st.bar_chart(imp_df.set_index('feature'))
-    try:
-        eq = pd.read_csv(eq_path, index_col=0, parse_dates=True)
-        st.line_chart(eq['equity'])
-    except FileNotFoundError:
-        st.warning("Run backtest first to generate equity curve.")
+try:
+    eq = pd.read_csv('results/equity_curve_v2.csv', index_col=0, parse_dates=True)
+    st.line_chart(eq['equity'])
+except FileNotFoundError:
+    st.warning("Run backtest_v2.py to generate V2 equity curve.")
