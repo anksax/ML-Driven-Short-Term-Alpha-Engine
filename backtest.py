@@ -35,8 +35,8 @@ def train_model_from_df(df_train):
 def walk_forward_backtest(
     feature_csv='data/btc_features.csv',
     initial_capital=10_000,
-    train_window=1000,       # ← Fits your 10k-row dataset (train on last ~1000 minutes)
-    retrain_interval=200,    # retrain roughly every 200 minutes
+    train_window=500,       # ← Fits your 10k-row dataset (train on last ~1000 minutes)
+    retrain_interval=100,    # retrain roughly every 200 minutes
     target_vol=0.002,
     base_position_fraction=0.05,
     slippage=0.0003,
