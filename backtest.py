@@ -68,7 +68,7 @@ def walk_forward_backtest(
         # -------------------------------------------
         if (t - start_index) % retrain_interval == 0:
             df_train = df.iloc[t - train_window : t].dropna()
-            if len(df_train) > 200:
+            if len(df_train) > 50:
                 model = train_model_from_df(df_train)
             else:
                 continue
